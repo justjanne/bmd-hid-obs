@@ -2,16 +2,20 @@ from __future__ import annotations
 
 import math
 import time
-from typing import Optional
+from typing import Optional, Callable
 
+import hid
 import obspython as obs
 from bmd_hid_device.cutmode import CutMode
-from bmd_hid_device.devices import BmdDeviceId
 from bmd_hid_device.hiddevice import BmdHidDevice
 from bmd_hid_device.jogmode import JogMode
 from bmd_hid_device.protocol.types import BmdHidLed, BmdHidKey, BmdHidJogMode
+from bmd_hid_device.util.deviceinfo import HidDeviceInfo
 
-import frontend_events
+from events import frontend_event
+from settings.transitions import TransitionSettings
+from ui_state.cutmode import CutModeHandler
+from util import FRONTEND_EVENT_NAMES
 
 cam_leds = [BmdHidLed.CAM1, BmdHidLed.CAM2, BmdHidLed.CAM3,
             BmdHidLed.CAM4, BmdHidLed.CAM5, BmdHidLed.CAM6,
@@ -23,71 +27,6 @@ all_cam_leds = BmdHidLed.CAM1 | BmdHidLed.CAM2 | BmdHidLed.CAM3 | \
                BmdHidLed.CAM4 | BmdHidLed.CAM5 | BmdHidLed.CAM6 | \
                BmdHidLed.CAM7 | BmdHidLed.CAM8 | BmdHidLed.CAM9
 
-FRONTEND_EVENT_NAMES: dict[obs.FrontendEvent, str] = {
-    obs.OBS_FRONTEND_EVENT_STREAMING_STARTING: "OBS_FRONTEND_EVENT_STREAMING_STARTING",
-    obs.OBS_FRONTEND_EVENT_STREAMING_STARTED: "OBS_FRONTEND_EVENT_STREAMING_STARTED",
-    obs.OBS_FRONTEND_EVENT_STREAMING_STOPPING: "OBS_FRONTEND_EVENT_STREAMING_STOPPING",
-    obs.OBS_FRONTEND_EVENT_STREAMING_STOPPED: "OBS_FRONTEND_EVENT_STREAMING_STOPPED",
-    obs.OBS_FRONTEND_EVENT_RECORDING_STARTING: "OBS_FRONTEND_EVENT_RECORDING_STARTING",
-    obs.OBS_FRONTEND_EVENT_RECORDING_STARTED: "OBS_FRONTEND_EVENT_RECORDING_STARTED",
-    obs.OBS_FRONTEND_EVENT_RECORDING_STOPPING: "OBS_FRONTEND_EVENT_RECORDING_STOPPING",
-    obs.OBS_FRONTEND_EVENT_RECORDING_STOPPED: "OBS_FRONTEND_EVENT_RECORDING_STOPPED",
-    obs.OBS_FRONTEND_EVENT_SCENE_CHANGED: "OBS_FRONTEND_EVENT_SCENE_CHANGED",
-    obs.OBS_FRONTEND_EVENT_SCENE_LIST_CHANGED: "OBS_FRONTEND_EVENT_SCENE_LIST_CHANGED",
-    obs.OBS_FRONTEND_EVENT_TRANSITION_CHANGED: "OBS_FRONTEND_EVENT_TRANSITION_CHANGED",
-    obs.OBS_FRONTEND_EVENT_TRANSITION_STOPPED: "OBS_FRONTEND_EVENT_TRANSITION_STOPPED",
-    obs.OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED: "OBS_FRONTEND_EVENT_TRANSITION_LIST_CHANGED",
-    obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED: "OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGED",
-    obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_LIST_CHANGED: "OBS_FRONTEND_EVENT_SCENE_COLLECTION_LIST_CHANGED",
-    obs.OBS_FRONTEND_EVENT_PROFILE_CHANGED: "OBS_FRONTEND_EVENT_PROFILE_CHANGED",
-    obs.OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED: "OBS_FRONTEND_EVENT_PROFILE_LIST_CHANGED",
-    obs.OBS_FRONTEND_EVENT_EXIT: "OBS_FRONTEND_EVENT_EXIT",
-
-    obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING: "OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTING",
-    obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED: "OBS_FRONTEND_EVENT_REPLAY_BUFFER_STARTED",
-    obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING: "OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPING",
-    obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED: "OBS_FRONTEND_EVENT_REPLAY_BUFFER_STOPPED",
-
-    obs.OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED: "OBS_FRONTEND_EVENT_STUDIO_MODE_ENABLED",
-    obs.OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED: "OBS_FRONTEND_EVENT_STUDIO_MODE_DISABLED",
-    obs.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED: "OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED",
-
-    obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP: "OBS_FRONTEND_EVENT_SCENE_COLLECTION_CLEANUP",
-    obs.OBS_FRONTEND_EVENT_FINISHED_LOADING: "OBS_FRONTEND_EVENT_FINISHED_LOADING",
-
-    obs.OBS_FRONTEND_EVENT_RECORDING_PAUSED: "OBS_FRONTEND_EVENT_RECORDING_PAUSED",
-    obs.OBS_FRONTEND_EVENT_RECORDING_UNPAUSED: "OBS_FRONTEND_EVENT_RECORDING_UNPAUSED",
-
-    obs.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED: "OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED",
-    obs.OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED: "OBS_FRONTEND_EVENT_REPLAY_BUFFER_SAVED",
-
-    obs.OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED: "OBS_FRONTEND_EVENT_VIRTUALCAM_STARTED",
-    obs.OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED: "OBS_FRONTEND_EVENT_VIRTUALCAM_STOPPED",
-
-    obs.OBS_FRONTEND_EVENT_TBAR_VALUE_CHANGED: "OBS_FRONTEND_EVENT_TBAR_VALUE_CHANGED",
-    obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING: "OBS_FRONTEND_EVENT_SCENE_COLLECTION_CHANGING",
-    obs.OBS_FRONTEND_EVENT_PROFILE_CHANGING: "OBS_FRONTEND_EVENT_PROFILE_CHANGING",
-    obs.OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN: "OBS_FRONTEND_EVENT_SCRIPTING_SHUTDOWN",
-    obs.OBS_FRONTEND_EVENT_PROFILE_RENAMED: "OBS_FRONTEND_EVENT_PROFILE_RENAMED",
-    obs.OBS_FRONTEND_EVENT_SCENE_COLLECTION_RENAMED: "OBS_FRONTEND_EVENT_SCENE_COLLECTION_RENAMED",
-    obs.OBS_FRONTEND_EVENT_THEME_CHANGED: "OBS_FRONTEND_EVENT_THEME_CHANGED",
-    obs.OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN: "OBS_FRONTEND_EVENT_SCREENSHOT_TAKEN",
-}
-
-
-def get_current_cut_mode() -> CutMode:
-    current_transition = obs.obs_frontend_get_current_transition()
-    current_transition_name = None
-    if current_transition is not None:
-        current_transition_name = obs.obs_source_get_name(current_transition)
-    obs.obs_source_release(current_transition)
-    if current_transition_name == "Cut":
-        return CutMode.CUT
-    elif current_transition_name == "Fade":
-        return CutMode.DIS
-    else:
-        return CutMode.SMTH_CUT
-
 
 def source_str(source: obs.Source):
     return "Source(id={0},type={1},name={2})".format(
@@ -98,30 +37,41 @@ def source_str(source: obs.Source):
 
 
 class ObsBmdDevice(BmdHidDevice):
-    cut_mode: CutMode
     jog_mode: JogMode
-    use_transitions: bool
     live_overwrite: bool
     duration: Optional[int]
     last_duration_set: Optional[int]
+    transitions: TransitionSettings
+    cutmode_handler: CutModeHandler
+    on_close: Callable[[], None]
 
-    def __init__(self, device: BmdDeviceId):
-        super().__init__(device)
-        frontend_events.add_frontend_event_listener(self.on_frontend_event)
+    def __init__(self, device_info: HidDeviceInfo, transitions: TransitionSettings,
+                 on_close: Callable[[ObsBmdDevice], None]):
+        self.on_close = on_close
+        super().__init__(device_info)
+        self.transitions = transitions
+        frontend_event.add_frontend_event_listener(self.on_frontend_event)
         obs.script_log(obs.LOG_INFO, "{0} registered for frontend events".format(self))
-        self.leds.clear()
-        self.update_jog_mode(JogMode.SCRL)
-        self.on_cut_mode_changed()
-        self.use_transitions = True
-        self.update_transition_state()
-        self.live_overwrite = False
-        self.duration = None
-        self.last_duration_set = None
+        self.cutmode_handler = CutModeHandler(transitions)
+        with self.leds as leds:
+            leds.clear()
+            self.update_jog_mode(JogMode.SCRL)
+            self.live_overwrite = False
+            self.duration = None
+            self.last_duration_set = None
+        self.settings_changed()
 
     def close(self):
-        frontend_events.remove_frontend_event_listener(self.on_frontend_event)
+        frontend_event.remove_frontend_event_listener(self.on_frontend_event)
         obs.script_log(obs.LOG_INFO, "{0} unregistered for frontend events".format(self))
+        try:
+            self.leds.off(BmdHidLed.TRANS | CutMode.leds() | all_cam_leds | BmdHidLed.LIVE_OWR)
+            self.leds.off(JogMode.leds())
+        except hid.HIDException:
+            # we try to disable LEDs if we're still connected, if we're not, just abandon all hope
+            pass
         super().close()
+        self.on_close(self)
 
     def update_jog_mode(self, mode: JogMode):
         self.jog_mode = mode
@@ -130,41 +80,17 @@ class ObsBmdDevice(BmdHidDevice):
             leds.on(mode.led())
         self.set_jog_mode(mode.mode())
 
-    def update_cut_mode(self, mode: CutMode):
-        self.cut_mode = mode
-        if mode == CutMode.CUT:
-            transition = obs.obs_get_transition_by_name("Cut")
-        elif mode == CutMode.DIS:
-            transition = obs.obs_get_transition_by_name("Fade")
-        else:
-            transition = None
-        if transition is not None:
-            obs.obs_frontend_set_current_transition(transition)
-            obs.obs_source_release(transition)
-
-    def on_cut_mode_changed(self):
-        cut_mode = get_current_cut_mode()
-        obs.script_log(obs.LOG_DEBUG, "cut mode changed, current cut mode: {0}".format(
-            cut_mode.name
-        ))
-        with self.leds as leds:
-            leds.off(CutMode.leds())
-            leds.on(cut_mode.led())
-
     def get_current_cam(self) -> Optional[int]:
         scenes = obs.obs_frontend_get_scenes()
         scene_names = [obs.obs_source_get_name(scene) for scene in scenes]
         obs.source_list_release(scenes)
         if self.live_overwrite:
-            preview_scene = obs.obs_frontend_get_current_preview_scene()
-            preview_scene_name = obs.obs_source_get_name(preview_scene)
-            obs.obs_source_release(preview_scene)
-            index = scene_names.index(preview_scene_name)
+            scene = obs.obs_frontend_get_current_scene()
         else:
-            preview_scene = obs.obs_frontend_get_current_scene()
-            preview_scene_name = obs.obs_source_get_name(preview_scene)
-            obs.obs_source_release(preview_scene)
-            index = scene_names.index(preview_scene_name)
+            scene = obs.obs_frontend_get_current_preview_scene()
+        scene_name = obs.obs_source_get_name(scene)
+        obs.obs_source_release(scene)
+        index = scene_names.index(scene_name)
         if index < 0 or index > len(cam_leds):
             return None
         return index
@@ -189,13 +115,17 @@ class ObsBmdDevice(BmdHidDevice):
             obs.obs_frontend_set_current_preview_scene(scenes[id])
             obs.source_list_release(scenes)
             if self.live_overwrite:
-                self.trigger_transition()
+                obs.obs_frontend_preview_program_trigger_transition()
 
     def on_frontend_event(self, event: obs.FrontendEvent):
-        if self.isclosed():
-            return
-        if event == obs.OBS_FRONTEND_EVENT_TRANSITION_CHANGED:
-            self.on_cut_mode_changed()
+        if event == obs.OBS_FRONTEND_EVENT_FINISHED_LOADING:
+            self.settings_changed()
+        elif event == obs.OBS_FRONTEND_EVENT_TRANSITION_CHANGED:
+            with self.leds as leds:
+                leds.off(CutModeHandler.all_leds())
+                leds.on(self.cutmode_handler.determine_status())
+        elif event == obs.OBS_FRONTEND_EVENT_SCENE_CHANGED:
+            self.on_scene_changed()
         elif event == obs.OBS_FRONTEND_EVENT_PREVIEW_SCENE_CHANGED:
             self.on_scene_changed()
         elif event == obs.OBS_FRONTEND_EVENT_TRANSITION_DURATION_CHANGED:
@@ -222,21 +152,6 @@ class ObsBmdDevice(BmdHidDevice):
                 self.last_duration_set = now
                 obs.script_log(obs.LOG_DEBUG, "trans_dur {0}".format(self.duration))
 
-    def update_transition_state(self):
-        with self.leds as leds:
-            leds.off(BmdHidLed.TRANS)
-            if self.use_transitions:
-                self.leds.on(BmdHidLed.TRANS)
-
-    def trigger_transition(self):
-        duration = obs.obs_frontend_get_transition_duration()
-        if not self.use_transitions:
-            obs.obs_frontend_set_transition_duration(0)
-            obs.obs_frontend_preview_program_trigger_transition()
-            obs.obs_frontend_set_transition_duration(duration)
-        else:
-            obs.obs_frontend_preview_program_trigger_transition()
-
     def on_key_down(self, key: BmdHidKey):
         obs.script_log(obs.LOG_DEBUG, "on_key_down: {0}".format(key.name))
         if key == BmdHidKey.SHTL:
@@ -245,15 +160,14 @@ class ObsBmdDevice(BmdHidDevice):
             self.update_jog_mode(JogMode.JOG)
         elif key == BmdHidKey.SCRL:
             self.update_jog_mode(JogMode.SCRL)
-        elif key == BmdHidKey.CUT:
-            self.update_cut_mode(CutMode.CUT)
-        elif key == BmdHidKey.DIS:
-            self.update_cut_mode(CutMode.DIS)
-        elif key == BmdHidKey.SMTH_CUT:
-            self.update_cut_mode(CutMode.SMTH_CUT)
+        elif key in CutMode.keys():
+            with self.leds as leds:
+                leds.off(CutModeHandler.all_leds())
+                leds.on(self.cutmode_handler.set_mode(CutMode.from_key(key)))
         elif key == BmdHidKey.TRANS:
-            self.use_transitions = not self.use_transitions
-            self.update_transition_state()
+            with self.leds as leds:
+                leds.off(CutModeHandler.all_leds())
+                leds.on(self.cutmode_handler.toggle_skip_transitions())
         elif key == BmdHidKey.TRANS_DUR:
             self.duration = obs.obs_frontend_get_transition_duration()
             self.set_jog_mode(BmdHidJogMode.RELATIVE_DEADZONE)
@@ -266,7 +180,9 @@ class ObsBmdDevice(BmdHidDevice):
                 if self.live_overwrite:
                     leds.on(BmdHidLed.LIVE_OWR)
         elif key == BmdHidKey.STOP_PLAY:
-            self.trigger_transition()
+            obs.obs_frontend_preview_program_trigger_transition()
+        else:
+            obs.script_log(obs.LOG_INFO, "Unknown key: {0}".format(key.name))
 
     def on_key_up(self, key: BmdHidKey):
         if key == BmdHidKey.TRANS_DUR:
@@ -275,3 +191,9 @@ class ObsBmdDevice(BmdHidDevice):
 
     def on_battery(self, charging: bool, level: int):
         pass
+
+    def settings_changed(self):
+        obs.script_log(obs.LOG_INFO, "Settings updated")
+        with self.leds as leds:
+            leds.off(CutModeHandler.all_leds())
+            leds.on(self.cutmode_handler.determine_status())

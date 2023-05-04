@@ -4,9 +4,10 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
-types-obspython = {ref = "29.0.2.2", git = "https://github.com/justjanne/types-obspython"}
+types-obspython = { ref = "29.0.2.2", git = "https://github.com/justjanne/types-obspython" }
 mypy = "*"
-bmd-hid-device = {ref = "0.1.1", git = "https://github.com/justjanne/bmd-hid-device"}
+hid = "*"
+bmd-hid-device = { ref = "0.1.7", git = "https://github.com/justjanne/bmd-hid-device" }
 
 [dev-packages]
 

@@ -19,4 +19,4 @@ def add_frontend_event_listener(listener: Callable[[obs.FrontendEvent], None]):
 
 def remove_frontend_event_listener(listener: Callable[[obs.FrontendEvent], None]):
     if listener in _listeners:
-        _listeners.append(listener)
+        _listeners.remove(listener)
