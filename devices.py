@@ -52,8 +52,10 @@ class DeviceManager:
             obs.script_log(obs.LOG_WARNING, "could not find any BMD device")
 
     def _on_close(self, device: ObsBmdDevice):
-        self._devices.remove(device)
-        self._device_infos.remove(device.device_info())
+        if device in self._devices:
+            self._devices.remove(device)
+        if device.device_info() in self._device_infos:
+            self._device_infos.remove(device.device_info())
 
     def update_devices(self):
         device_infos = self._find_devices()
@@ -62,8 +64,8 @@ class DeviceManager:
         current_devices = [device.device_info() for device in self._devices]
         if current_devices != device_infos:
             obs.script_log(obs.LOG_INFO, "Device list has changed: from {0} to {1}".format(
-                device_infos,
-                current_devices,
+                [(i["vendor_id"], i["product_id"], i["serial_number"]) for i in device_infos],
+                [(i["vendor_id"], i["product_id"], i["serial_number"]) for i in current_devices],
             ))
             self._destroy_devices()
             self._init_devices()
@@ -71,15 +73,19 @@ class DeviceManager:
     def poll_input(self):
         for device in self._devices:
             if device.isclosed():
-                self._devices.remove(device)
-                self._device_infos.remove(device.device_info())
+                if device in self._devices:
+                    self._devices.remove(device)
+                if device.device_info() in self._device_infos:
+                    self._device_infos.remove(device.device_info())
             try:
                 device.poll_available()
             except hid.HIDException as e:
                 obs.script_log(obs.LOG_ERROR, "Error communicating with device: {0}".format(e))
                 device.close()
-                self._devices.remove(device)
-                self._device_infos.remove(device.device_info())
+                if device in self._devices:
+                    self._devices.remove(device)
+                if device.device_info() in self._device_infos:
+                    self._device_infos.remove(device.device_info())
 
     def settings_changed(self):
         for device in self._devices:
