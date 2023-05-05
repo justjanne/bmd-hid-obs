@@ -7,7 +7,7 @@ name = "pypi"
 types-obspython = { ref = "29.0.2.2", git = "https://github.com/justjanne/types-obspython" }
 mypy = "*"
 hid = "*"
-bmd-hid-device = { ref = "0.1.7", git = "https://github.com/justjanne/bmd-hid-device" }
+bmd-hid-device = { ref = "0.1.8", git = "https://github.com/justjanne/bmd-hid-device" }
 
 [dev-packages]
 

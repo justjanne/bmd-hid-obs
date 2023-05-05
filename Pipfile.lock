@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "5d08b966c5678839a19ac3a8f2874b79dafe7e23f0670628dc2a3dc653701bac"
+            "sha256": "091b576e0b212a96deaad2cf90b1ab23ec0e489676bdc4af90453dd355b96b50"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -18,7 +18,7 @@
     "default": {
         "bmd-hid-device": {
             "git": "https://github.com/justjanne/bmd-hid-device",
-            "ref": "1d7125f822186a277362e4d1f4c20577fc3f7ba5"
+            "ref": "6e61365b43e8c2b59d0412fcef5459111286e618"
         },
         "hid": {
             "hashes": [

@@ -74,7 +74,7 @@ class DeviceManager:
                 self._devices.remove(device)
                 self._device_infos.remove(device.device_info())
             try:
-                device.poll(1)
+                device.poll_available()
             except hid.HIDException as e:
                 obs.script_log(obs.LOG_ERROR, "Error communicating with device: {0}".format(e))
                 device.close()
