@@ -7,9 +7,11 @@
 ```
 # Editor Keyboard
 SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="1edb", ATTRS{idProduct}=="da0b", MODE="0666"
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", KERNELS=="*:1EDB:DA0B.*", MODE="0666"
 
-# Speed Editor Keyboard
+# Speed Editor
 SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="1edb", ATTRS{idProduct}=="da0e", MODE="0666"
+SUBSYSTEM=="hidraw", KERNEL=="hidraw*", KERNELS=="*:1EDB:DA0E.*", MODE="0666"
 ```
 
 ## Installation
