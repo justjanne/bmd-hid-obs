@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import time
 from typing import Optional, Callable
 
 import hid
@@ -40,7 +39,6 @@ class ObsBmdDevice(BmdHidDevice):
     jog_mode: JogMode
     live_overwrite: bool
     duration: Optional[int]
-    last_duration_set: Optional[int]
     transitions: TransitionSettings
     cutmode_handler: CutModeHandler
     on_close: Callable[[], None]
@@ -58,7 +56,6 @@ class ObsBmdDevice(BmdHidDevice):
             self.update_jog_mode(JogMode.SCRL)
             self.live_overwrite = False
             self.duration = None
-            self.last_duration_set = None
         self.settings_changed()
 
     def close(self):
@@ -146,11 +143,7 @@ class ObsBmdDevice(BmdHidDevice):
                 self.duration = 50
             if self.duration > 20000:
                 self.duration = 20000
-            now = time.monotonic_ns()
-            if self.last_duration_set is None or now - self.last_duration_set > 1_000_000:
-                obs.obs_frontend_set_transition_duration(int(self.duration))
-                self.last_duration_set = now
-                obs.script_log(obs.LOG_DEBUG, "trans_dur {0}".format(self.duration))
+            obs.obs_frontend_set_transition_duration(int(self.duration))
 
     def on_key_down(self, key: BmdHidKey):
         obs.script_log(obs.LOG_DEBUG, "on_key_down: {0}".format(key.name))
