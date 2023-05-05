@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import __venv__ as venv
 import obspython as obs
 
 from devices import DeviceManager
 from events.frontend_event import on_frontend_event_global
 from settings.transitions import TransitionSettings
+
+if not venv.activated:
+    raise RuntimeError("Not running in venv, aborting")
 
 transition_settings = TransitionSettings()
 device_manager = DeviceManager(transition_settings)
