@@ -1,44 +1,47 @@
 # OBS Plugin for Blackmagic HID Devices
 
-## Prerequisites
-
-1. `sudo apt install libhidapi-hidraw0 libhidapi-libusb0`
-2. Create `/etc/udev/rules.d/70-blackmagic.rules` with the following content:
-```
-# Editor Keyboard
-SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="1edb", ATTRS{idProduct}=="da0b", MODE="0666"
-SUBSYSTEM=="hidraw", KERNEL=="hidraw*", KERNELS=="*:1EDB:DA0B.*", MODE="0666"
-
-# Speed Editor
-SUBSYSTEM=="hidraw", KERNEL=="hidraw*", ATTRS{idVendor}=="1edb", ATTRS{idProduct}=="da0e", MODE="0666"
-SUBSYSTEM=="hidraw", KERNEL=="hidraw*", KERNELS=="*:1EDB:DA0E.*", MODE="0666"
-```
-
 ## Installation
 
-1. `git clone https://github.com/justjanne/bmd-hid-obs.git`
-2. `pipenv install`
-3. Open OBS, navigate to Tools › Scripts and add the script
-   `bmd-hid-obs/main.py`
+1. Make sure you've installed all [prerequisites](PREREQUISITES.md)
+2. `git clone https://github.com/justjanne/bmd-hid-obs.git`
+3. `pipenv install`
+4. Open OBS, navigate to Tools › Scripts and add the script
+   `bmd_obs_plugin.py`
 
 ## Usage
 
 Just connect your Resolve SpeedEditor. The script automatically discovers all
 attached devices.
 
+### Settings
+
+- **Transition: None**  
+  Choose which transition should be used when transitions have been disabled
+  with the <kbd>TRANS</kbd> button.
+- **Transition: Cut**  
+  Choose which transition should be selected when pressing <kbd>CUT</kbd>.
+- **Transition: Dis**  
+  Choose which transition should be selected when pressing <kbd>DIS</kbd>.
+- **Transition: Smth Cut**  
+  Choose which transition should be selected when pressing 
+  <kbd>SMTH CUT</kbd>. 
+
 ### Scene Switching
 
 <kbd>CAM1</kbd> through <kbd>CAM9</kbd> allow you to choose the first 9 scenes
 in your scene collection.
 
-By default, these buttons switch the preview scene. You can then use 
-<kbd>STOP/PLAY</kbd> to switch them onto the program output.  
-If <kbd>LIVE O/WR</kbd> is enabled, these buttons directly affect the program 
-output.
+By default, these buttons switch the preview scene. Use <kbd>STOP/PLAY</kbd> 
+to switch the current preview onto the program output. If <kbd>LIVE O/WR</kbd>
+is enabled, these buttons directly affect the program output.
 
 ### Transitions
 
-Via the properties, you can choose custom transitions for the buttons 
-<kbd>CUT</kbd>, <kbd>DIS</kbd> and <kbd>SMTH CUT</kbd>.
+You can use <kbd>TRANS</kbd> to toggle transition animations.
 
-These buttons allow you to easily toggle the currently selected transition.
+If transitions are enabled, you can use <kbd>CUT</kbd>, <kbd>DIS</kbd> and
+<kbd>SMTH CUT</kbd> to quickly choose transition animations.
+
+If the current transition supports configuring the duration, you can hold
+<kbd>TRANS DUR</kbd> and use the jog wheel to adjust the transition duration.
+
