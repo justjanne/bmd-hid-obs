@@ -190,7 +190,9 @@ class ObsBmdDevice(BmdHidDevice):
             self.duration = None
 
     def on_battery(self, charging: bool, level: int):
-        pass
+        obs.script_log(obs.LOG_INFO, "battery status changed: charging {0}, level {1}%".format(
+            charging, level
+        ))
 
     def settings_changed(self):
         obs.script_log(obs.LOG_INFO, "Settings updated")
